@@ -1,6 +1,7 @@
 -- SAT_DP.hs - DP Algorithm using Bucket Elimination in Haskell
 -- Copyright (C) 2026 Robert Coffey
 
+import Data.Char (isSpace, toLower)
 import Data.Int (Int64)
 import Data.Maybe (isNothing, mapMaybe)
 import Text.Read (readMaybe)
@@ -24,18 +25,20 @@ parseDIMACSHeader line = case words line of
 parseDIMACSClause :: String -> Maybe Clause
 parseDIMACSClause line = case words line of
   [] -> Nothing
-  "c" : xs -> Nothing
   xs -> let literals = init xs
             end = last xs
         in if (end /= "0")
            then Nothing
            else Just (map (\x -> read x :: Literal) literals)
 
--- TODO: Comments and blank lines.
+-- Parse string containing DIMACS CNF format header and clauses.
+-- Skips comment lines and empty lines.
 parseDIMACS :: String -> Maybe CNF
 parseDIMACS file_str =
-  let header : clause_lines = lines file_str
-      (n_vars, n_clauses) = case parseDIMACSHeader header of
+  let file_lines = filter (\x -> x /= "" && toLower (head x) /= 'c')
+                   (map (dropWhile isSpace) (lines file_str))
+      header_line : clause_lines = file_lines
+      (n_vars, n_clauses) = case parseDIMACSHeader header_line of
              Just (x, y) -> (x, y)
              Nothing     -> (0, 0)
   in if (n_vars, n_clauses) == (0, 0)
