@@ -6,6 +6,7 @@ import Data.Char (isSpace, toLower)
 import Data.Int (Int64)
 import Data.List (partition)
 import Data.Maybe (mapMaybe)
+import Debug.Trace (trace)
 import Text.Read (readMaybe)
 
 -- CNF -------------------------------------------------------------------------
@@ -57,7 +58,8 @@ fillBuckets (v:vars) (CNF _ _ clauses) =
 -- Insert clause into buckets such that clause is placed into the first bucket
 -- in list which represents a variable that is in clause.
 insertClause :: Clause -> [Bucket] -> [Bucket]
-insertClause _ [] = []  -- TODO: ERROR?
+insertClause [] _ = trace "error: attempted to insert empty clause" []
+insertClause _ [] = trace "error: no bucket found for clause" []
 insertClause clause (b:buckets) =
   if clauseHasVar (buk_var b) clause
   then Bucket (buk_var b) (clause : (buk_clauses b)) : buckets
@@ -74,6 +76,7 @@ resolveBuckets [] = []  -- TODO: ERROR if resolvents remain?
 resolveBuckets (b:buckets) =
   let rs = resolveAll (buk_var b) (buk_clauses b)
   in b : resolveBuckets (insertClauses rs buckets)
+  --in trace (show rs) (b : resolveBuckets (insertClauses rs buckets))
 
 -- Parser ----------------------------------------------------------------------
 
@@ -117,14 +120,27 @@ parseDIMACS file_str =
 
 -- Main ------------------------------------------------------------------------
 
+newline :: IO ()
+newline = putStrLn ""
+
 main' :: String -> IO ()
 main' str = do
   let maybe_cnf = parseDIMACS str
   case maybe_cnf of
     Nothing  -> putStrLn "error: invalid CNF"
-    Just cnf ->
-      let buckets = resolveBuckets (fillBuckets [1..(cnf_n_vars cnf)] cnf)
-      in print (show buckets)
+    Just cnf -> do
+      putStr "Initial CNF: "
+      print cnf
+      newline
+
+      let buckets = fillBuckets [1..(cnf_n_vars cnf)] cnf
+      putStrLn "Initial Buckets: "
+      mapM_ print buckets
+      newline
+
+      let res_buks = resolveBuckets buckets
+      putStrLn "Resolved Buckets: "
+      mapM_ print res_buks
 
 main :: IO ()
 main = do
