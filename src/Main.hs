@@ -82,7 +82,7 @@ instance Show Bucket where
 -- For each clause, place clause in first bucket whose variable is in clause.
 fillBuckets :: [Variable] -> [Clause] -> [Bucket]
 fillBuckets vars [] = map (\v -> Bucket v []) vars
-fillBuckets [] _ = assert (False) []  -- TODO: ERROR: clauses remain
+fillBuckets [] _ = assert (False) []
 fillBuckets (v:vars) clauses =
   let (clauses_with, clauses_without) = partition (clauseHasVar v) clauses
   in Bucket v clauses_with : fillBuckets vars clauses_without
@@ -152,6 +152,9 @@ extractSolution buckets =
 
 -- Parser ----------------------------------------------------------------------
 
+parseFail :: String -> Maybe a
+parseFail msg = trace ("error: parse failed: " ++ msg) Nothing
+
 -- Expects string of form "p cnf n_vars n_clauses".
 -- Returns Maybe (n_vars, n_clauses).
 parseDIMACSHeader :: String -> Maybe (Int64, Int64)
@@ -160,35 +163,43 @@ parseDIMACSHeader line = case words line of
     n_vars    <- readMaybe str_n_vars
     n_clauses <- readMaybe str_n_clauses
     Just (n_vars, n_clauses)
-  _ -> Nothing
+  _ -> trace "error: parse failed: invalid header" Nothing
 
 -- Expects string of form "lit ... lit 0" (lit not zero, zero or more lits).
-parseDIMACSClause :: String -> Maybe Clause
-parseDIMACSClause line = case words line of
-  [] -> Nothing
-  xs -> let literals = init xs
-            end = last xs
-        in if (end /= "0")
-           then Nothing
-           else Just (map (\x -> read x :: Literal) literals)
+parseDIMACSClause :: Variable -> String -> Maybe Clause
+parseDIMACSClause max_var line = case words line of
+  [] -> parseFail "empty clause line"  -- NOTE: Should never reach here.
+  xs -> let lits = init xs; end = last xs in
+          if end /= "0"
+          then parseFail "missing clause terminator"
+          else let parsed = mapMaybe (\x -> readMaybe x :: Maybe Literal) lits
+               in if (length parsed) /= (length lits)
+                  then parseFail "failed to parse literal"
+                  else if any (\lit -> lit == 0 || abs lit > max_var) parsed
+                       then parseFail "literal out of range"
+                       else Just parsed
 
--- TODO: Check if variable out of range or wrong number of clauses.
+-- TODO: Stop printing "not enough"/"too many" clauses when real error was
+-- failed to parse literal.
+parseDIMACS' :: [String] -> Maybe CNF
+parseDIMACS' [] = parseFail "missing header"
+parseDIMACS' (header_line : clause_lines) = do
+  (n_vars, n_clauses) <- parseDIMACSHeader header_line
+  let clauses = mapMaybe (\c -> parseDIMACSClause n_vars c) clause_lines
+      diff = n_clauses - (fromIntegral $ length clauses)
+  if diff > 0
+  then parseFail "not enough clauses"
+  else if diff < 0
+       then parseFail "too many clauses"
+       else Just $ CNF n_vars n_clauses clauses
+
 -- Parse string containing DIMACS CNF format header and clauses.
 -- Skips comment lines and empty lines.
 parseDIMACS :: String -> Maybe CNF
 parseDIMACS file_str =
   let relev_lines = filter (\x -> x /= "" && toLower (head x) /= 'c')
                     (map (dropWhile isSpace) (lines file_str))
-      header_line : clause_lines = relev_lines  -- TODO: Handle error cases.
-      (n_vars, n_clauses) = case parseDIMACSHeader header_line of
-                              Just (x, y) -> (x, y)
-                              Nothing     -> (0, 0)
-  in if (n_vars, n_clauses) == (0, 0)
-     then Nothing
-     else let clauses = mapMaybe parseDIMACSClause clause_lines
-          in if n_clauses /= (fromIntegral $ length clauses)
-             then Nothing
-             else Just $ CNF n_vars n_clauses clauses
+  in parseDIMACS' relev_lines
 
 -- Main ------------------------------------------------------------------------
 
