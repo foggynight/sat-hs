@@ -8,8 +8,7 @@ import Data.Int (Int64)
 import Data.List (nub, partition, sortOn)
 import Data.Maybe (mapMaybe)
 import Debug.Trace (trace)
-import Options.Applicative -- TODO
-import System.Environment (getArgs)
+import Options.Applicative
 import Text.Read (readMaybe)
 
 -- Util ------------------------------------------------------------------------
@@ -88,15 +87,6 @@ data Bucket = Bucket
 instance Show Bucket where
   show buk = show (buk_var buk) ++ ": " ++ show (buk_clauses buk)
 
-varOrderNumeric :: Variable -> [Variable]
-varOrderNumeric max_var = [1 .. max_var] ++ [0]
-
-varOrderFewestClauses :: Variable -> [Clause] -> [Variable]
-varOrderFewestClauses max_var clauses =
-  let occurs = map count_occurs [1 .. max_var] in
-    (map fst $ sortOn snd occurs) ++ [0]
-  where count_occurs var = (var, sum $ map ((count var) . (map abs)) clauses)
-
 -- Create and fill buckets in order of vars.
 -- For each clause, place clause in first bucket whose variable is in clause.
 fillBuckets :: [Variable] -> [Clause] -> [Bucket]
@@ -171,6 +161,8 @@ extractSolution buckets =
 
 -- Parser ----------------------------------------------------------------------
 
+type DIMACS_CNF = String
+
 parseFail :: String -> Maybe a
 parseFail msg = trace ("error: parse failed: " ++ msg) Nothing
 
@@ -178,7 +170,7 @@ parseFail msg = trace ("error: parse failed: " ++ msg) Nothing
 -- Returns Maybe (n_vars, n_clauses).
 parseDIMACSHeader :: String -> Maybe (Int64, Int64)
 parseDIMACSHeader line = case words line of
-  [_, _, str_n_vars, str_n_clauses] -> do
+  ["p", "cnf", str_n_vars, str_n_clauses] -> do
     n_vars    <- readMaybe str_n_vars
     n_clauses <- readMaybe str_n_clauses
     Just (n_vars, n_clauses)
@@ -214,17 +206,51 @@ parseDIMACS' (header_line : clause_lines) = do
 
 -- Parse string containing DIMACS CNF format header and clauses.
 -- Skips comment lines and empty lines.
-parseDIMACS :: String -> Maybe CNF
+parseDIMACS :: DIMACS_CNF -> Maybe CNF
 parseDIMACS file_str =
-  let relev_lines = filter (\x -> x /= "" && toLower (head x) /= 'c')
-                    (map (dropWhile isSpace) (lines file_str))
+  let relev_lines = filter (\x -> case x of
+                               (c:_) -> toLower c /= 'c'
+                               _     -> False)
+                           (map (dropWhile isSpace) (lines file_str))
   in parseDIMACS' relev_lines
 
 -- Main ------------------------------------------------------------------------
 
-main' :: String -> IO ()
-main' str = do
-  let maybe_cnf = parseDIMACS str
+data Config = Config
+  { conf_var_order :: String
+  , conf_cnf_file :: String
+  } deriving (Show)
+
+configParser :: Parser Config
+configParser = Config
+  <$> strOption
+  ( short 'R'
+    <> long "order"
+    <> value "numeric"
+    <> showDefault
+    <> help "Variable ordering strategy." )
+  <*> strArgument
+  ( metavar "CNF_FILE"
+    <> value "--"
+    <> showDefault
+    <> help "Filename of input DIMACS CNF file." )
+
+type VarOrder = CNF -> [Variable]
+
+varOrderNumeric :: VarOrder
+varOrderNumeric cnf = [1 .. (cnf_n_vars cnf)] ++ [0]
+
+varOrderFewestClauses :: VarOrder
+varOrderFewestClauses cnf =
+  let clauses = (cnf_clauses cnf)
+      occurs = map (count_occurs clauses) [1 .. (cnf_n_vars cnf)] in
+    (map fst $ sortOn snd occurs) ++ [0]
+  where count_occurs clauses var =
+          (var, sum $ map ((count var) . (map abs)) clauses)
+
+main' :: DIMACS_CNF -> VarOrder -> IO ()
+main' dimacs_cnf vo_func = do
+  let maybe_cnf = parseDIMACS dimacs_cnf
   case maybe_cnf of
     Nothing  -> putStrLn "error: invalid CNF"
     Just cnf -> do
@@ -232,9 +258,9 @@ main' str = do
       print cnf
       newline
 
-      -- TODO: Handle variable ordering.
-      let var_order = varOrderFewestClauses (cnf_n_vars cnf) (cnf_clauses cnf)
+      let var_order = vo_func cnf
       let buckets = fillBuckets var_order (cnf_clauses cnf)
+
       putStrLn "Initial Buckets: "
       mapM_ print buckets
       newline
@@ -254,12 +280,17 @@ main' str = do
 
 main :: IO ()
 main = do
-  args <- getArgs
-  let argc = length args
-  if argc > 1
-  then putStrLn $ "error: too many arguments"
-  else do
-    input <- if argc == 0
-             then getContents
-             else readFile (head args)
-    main' input
+  config <- execParser opts
+  let var_order = case conf_var_order config of
+                    "numeric" -> varOrderNumeric
+                    "fewest"  -> varOrderFewestClauses
+                    _         -> trace "error: invalid variable order argument"
+                                       varOrderNumeric
+  dimacs_cnf <- case conf_cnf_file config of
+                  "--" -> getContents
+                  file -> readFile file
+  main' dimacs_cnf var_order
+  where opts = info (configParser <**> helper)
+               ( fullDesc
+                 <> header ( "SatDP - SAT solver using DP algorithm implemented"
+                          ++ " with bucket elimination." ) )

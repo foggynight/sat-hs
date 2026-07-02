@@ -20,5 +20,7 @@ executable SatDP
     -- other-modules: Modules included in this executable, other than Main.
     default-language: Haskell2010
     -- other-extensions: LANGUAGE extensions used by modules in this package.
-    build-depends:    base ^>=4.18.2.1,
-                      extra
+    -- TODO: Add versions to dependencies.
+    build-depends:    base,
+                      extra,
+                      optparse-applicative

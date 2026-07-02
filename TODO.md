@@ -1,3 +1,4 @@
 - [ ] update README: lang, build, usage, input/output format
 - [ ] output solution in DIMACS solution format
 - [ ] add option to short-circuit when first empty clause derived
+- [ ] add option for verbose/quiet mode
