@@ -132,7 +132,9 @@ resolveBuckets (b:buckets) = do
       then do putStrLn " (tautology)" ; pure Nothing
       else do
         case findBucket res buckets of
-          Nothing             -> pure Nothing
+          Nothing -> do
+            putStrLn " (failed to find bucket)"
+            pure Nothing
           Just (Bucket var _) -> do
             putStrLn $ concat [" (adding to bucket: ", show var, ")" ]
             pure $ Just res
