@@ -13,14 +13,14 @@ type VarOrderF = CNF -> [Variable]
 
 -- Numeric: Select variables in numerical order.
 varOrderNumeric :: VarOrderF
-varOrderNumeric cnf = [1 .. (cnf_n_vars cnf)] ++ [0]
+varOrderNumeric cnf = [1 .. (cnf_n_vars cnf)]
 
 -- Fewest Clauses: Select variable which occurs in the fewest clauses.
 varOrderFewestClauses :: VarOrderF
 varOrderFewestClauses cnf =
   let clauses = (cnf_clauses cnf)
       occurs = map (count_occurs clauses) [1 .. (cnf_n_vars cnf)] in
-    (map fst $ sortOn snd occurs) ++ [0]
+    (map fst $ sortOn snd occurs)
   where count_occurs clauses var =
           (var, sum $ map ((count var) . (map abs)) clauses)
 
@@ -30,7 +30,7 @@ varOrderJeroslowWang :: VarOrderF
 varOrderJeroslowWang (CNF n_vars _ clauses) =
   let vars = [1 .. n_vars]
       vws = zip vars (map calc_weight vars)
-  in (map fst $ sortOn (Down . snd) vws) ++ [0]
+  in (map fst $ sortOn (Down . snd) vws)
   where calc_weight var =
           sum $ map (\c -> 2 ^^ (- (length c)) :: Double)
                 $ filter (clauseHasVar var) clauses

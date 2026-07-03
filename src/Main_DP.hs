@@ -4,7 +4,6 @@
 module Main where
 
 import Control.Exception (assert)
-import Control.Monad (when)
 import Data.Char (toLower)
 import Data.List (nub, partition)
 import Data.Maybe (mapMaybe)
@@ -214,9 +213,7 @@ main = do
   case maybe_cnf of
     Nothing  -> putStrLn "error: invalid CNF"
     Just cnf -> do
-      let var_order = vo_func cnf
-      when (last var_order /= 0) $
-        error "error: variable order doesn't end with 0"
+      let var_order = (vo_func cnf) ++ [0]
       solve_DP cnf var_order
 
   where opts = info (configParser <**> helper)
