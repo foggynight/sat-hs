@@ -10,7 +10,6 @@ build-type:         Simple
 extra-doc-files:    README.md, LICENSE
 extra-source-files: examples/*.dimacs
 
-
 common warnings
     ghc-options: -Wall
 
@@ -30,4 +29,4 @@ executable sat-dpll
     main-is:          Main_DPLL.hs
     other-modules:    CNF, DIMACS, Util, VarOrder
     default-language: Haskell2010
-    build-depends:    base, optparse-applicative
+    build-depends:    array >= 0.5.8.0, base, optparse-applicative

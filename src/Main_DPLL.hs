@@ -3,10 +3,12 @@
 
 module Main where
 
-import Control.Monad (when)
+import Data.Array (Array, listArray, (!))
 import Data.Char (toLower)
+import Data.IORef
 import Debug.Trace (trace)
 import Options.Applicative
+import System.IO.Unsafe (unsafePerformIO)
 
 import CNF
 import DIMACS
@@ -15,8 +17,58 @@ import VarOrder
 
 -- DPLL ------------------------------------------------------------------------
 
-solve_DPLL :: CNF -> [Variable] -> IO ()
-solve_DPLL cnf var_order = pure ()
+{-# NOINLINE dpll_count #-}
+dpll_count :: IORef Int
+dpll_count = unsafePerformIO (newIORef 0)
+
+dpll :: Array Int Variable -> [Clause] -> Int -> IO (Maybe [Literal])
+dpll _ [] _ = do
+  modifyIORef' dpll_count (+ 1)
+  pure $ Just []
+dpll var_order clauses depth = do
+  let print_prefix = concat $ replicate (depth - 1) "    "
+  if elem [] clauses
+  then do putStrLn (print_prefix ++ "BACKTRACK: Found empty clause.")
+          modifyIORef' dpll_count (+ 1)
+          pure Nothing
+  else do
+    let var = var_order ! depth
+
+    let clauses_pos = (conditionClauses var clauses)
+    putStrLn $ concat [print_prefix, " ", show var, " -> ", show clauses_pos]
+    next_pos <- dpll var_order clauses_pos (depth + 1)
+
+    if next_pos /= Nothing
+    then pure $ Just var `consM` next_pos
+    else do
+      let clauses_neg = (conditionClauses (-var) clauses)
+      putStrLn $ concat [print_prefix, show (-var), " -> ", show clauses_neg]
+      next_neg <- dpll var_order clauses_neg (depth + 1)
+
+      if next_neg /= Nothing
+      then pure $ Just (-var) `consM` next_neg
+      else pure $ Nothing
+
+solve_dpll :: CNF -> [Variable] -> IO ()
+solve_dpll cnf var_order = do
+  putStrLn $ "Initial CNF: " ++ show cnf
+  newline
+
+  putStrLn $ "Variable Order: " ++ show var_order
+  newline
+
+  putStrLn $ "Searching for satisfying assignment..."
+  result <- dpll
+        (listArray (1, (cnf_n_vars cnf)) var_order)
+        (cnf_clauses cnf)
+        1
+  dpll_count' <- readIORef dpll_count
+  putStrLn $ "Assignments checked: " ++ show dpll_count'
+  newline
+
+  case result of
+    Nothing   -> putStrLn "UNSAT"
+    Just lits -> putStrLn $ "SAT: " ++ show lits
 
 -- Main ------------------------------------------------------------------------
 
@@ -59,9 +111,7 @@ main = do
     Nothing  -> putStrLn "error: invalid CNF"
     Just cnf -> do
       let var_order = vo_func cnf
-      when (last var_order /= 0) $
-        error "error: variable order doesn't end with 0"
-      solve_DPLL cnf var_order
+      solve_dpll cnf var_order
 
   where opts = info (configParser <**> helper)
                ( fullDesc

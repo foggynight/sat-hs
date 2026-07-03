@@ -24,3 +24,16 @@ clauseHasVar var (lit:lits) = (abs lit == var) || clauseHasVar var lits
 clauseIsTautology :: Clause -> Bool
 clauseIsTautology [] = False
 clauseIsTautology (l:lits) = elem (-l) lits || clauseIsTautology lits
+
+conditionClause :: Literal -> Clause -> Maybe Clause
+conditionClause lit clause
+  | elem lit clause = Nothing
+  | otherwise       = Just $ filter (/= -lit) clause
+
+conditionClauses :: Literal -> [Clause] -> [Clause]
+conditionClauses _ [] = []
+conditionClauses lit (c:cs) =
+  case conditionClause lit c of
+    Nothing -> rest
+    Just cc -> cc : rest
+  where rest = conditionClauses lit cs
