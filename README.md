@@ -1,4 +1,4 @@
-# SatDP
+# sat-dp
 
 SAT solver using the DP (Davis-Putnam) algorithm, also known as Directional
 Resolution.
@@ -23,7 +23,7 @@ TODO
 ## Usage
 
 ```sh
-SatDP [FILE]
+sat-dp [FILE]
 ```
 
 - FILE: Input DIMACS CNF file, if not provided reads from stdin.

@@ -1,4 +1,4 @@
--- SAT_DP.hs - DP Algorithm using Bucket Elimination in Haskell
+-- sat-dp - DP Algorithm using Bucket Elimination in Haskell
 -- Copyright (C) 2026 Robert Coffey
 
 import Control.Exception (assert)

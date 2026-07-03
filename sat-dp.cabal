@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               SatDP
+name:               sat-dp
 version:            0.1.0.0
 synopsis:           SAT solver using the Davis-Putnam or Directional Resolution algorithm.
 license:            MIT
@@ -13,7 +13,7 @@ extra-source-files: examples/*.dimacs
 common warnings
     ghc-options: -Wall
 
-executable SatDP
+executable sat-dp
     import:           warnings
     hs-source-dirs:   src
     main-is:          Main.hs
