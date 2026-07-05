@@ -1,0 +1,9 @@
+c Demonstration of recursive pure literal elimination. First pass eliminates
+c variable 1 and clauses 1 and 2, which causes variable 2 to become pure.
+
+p cnf 3 4
+
+1 2 0
+1 -2 0
+-2 3 0
+-2 -3 0
