@@ -1,0 +1,7 @@
+c Demonstration of unit clause propagation on a satisfiable formula.
+
+p cnf 3 3
+
+1 0
+1 2 0
+-1 -2 -3 0

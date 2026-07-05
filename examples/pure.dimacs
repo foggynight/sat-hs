@@ -1,4 +1,4 @@
-c Demonstration of pure literal elimination.
+c Demonstration of pure literal elimination on a satisfiable formula.
 
 p cnf 3 3
 

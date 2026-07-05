@@ -3,7 +3,6 @@
 
 module Main where
 
-import Control.Monad (when)
 import Data.Char (toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List ((\\))
@@ -84,16 +83,24 @@ clauseUnitLit (lit:lits)
   | null $ filter (/= lit) lits = Just lit
   | otherwise                   = Nothing
 
+firstUnitLit :: [Clause] -> Maybe Literal
+firstUnitLit [] = Nothing
+firstUnitLit (c:cs) = case clauseUnitLit c of
+                        Nothing  -> firstUnitLit cs
+                        Just lit -> Just lit
+
 -- Search for unit literals (single unassigned literal in a clause), and
 -- condition formula over each literal.
 unitClauseProp :: String -> [Clause] -> IO ([Literal], [Clause])
 unitClauseProp prefix clauses = do
-  let unit_lits = mapMaybe clauseUnitLit clauses
-      new_clauses = mapMaybe (conditionClauseLits unit_lits) clauses
-  when (not $ null unit_lits) $
-    putStr $ concat
-      [prefix, "Unit Lits: ", show unit_lits, " -> CNF: ", show new_clauses]
-  pure (unit_lits, new_clauses)
+  case firstUnitLit clauses of
+    Nothing       -> pure ([], clauses)
+    Just unit_lit -> do
+      let cond_clauses = mapMaybe (conditionClause unit_lit) clauses
+      putStr $ concat
+        [prefix, "Unit Lit: ", show unit_lit, " -> CNF: ", show cond_clauses]
+      (next_lits, next_clauses) <- unitClauseProp prefix cond_clauses
+      pure (unit_lit : next_lits, next_clauses)
 
 -- DPLL ------------------------------------------------------------------------
 
@@ -126,11 +133,12 @@ dpll _ [] clauses _
 dpll conf (var:vars) clauses depth
   | elem [] clauses = dpll_backtrack
   | (conf_UCP conf) = do
-      (lits, cs) <- unitClauseProp print_prefix clauses
-      if null lits
+      (unit_lits, cs) <- unitClauseProp print_prefix clauses
+      if null unit_lits
       then splitOnVar var vars clauses
-      else do maybe_lits <- dpll conf ((var:vars) \\ lits) cs (depth + 1)
-              pure $ Just lits `appendM` maybe_lits
+      else do let next_vars = (var:vars) \\ (map abs unit_lits)
+              maybe_lits <- dpll conf next_vars cs (depth + 1)
+              pure $ Just unit_lits `appendM` maybe_lits
   | otherwise = splitOnVar var vars clauses
   where
     print_prefix = "\n[Depth " ++ show depth ++ "] "
@@ -202,7 +210,7 @@ data Config = Config
   , conf_UCP :: Bool
   } deriving (Show)
 
--- TODO: Make flags case-insensitive?
+-- TODO: Should flags be case-insensitive? Hmm, makes --help kind of noisy.
 configParser :: Parser Config
 configParser = Config
   <$> strArgument
@@ -211,20 +219,20 @@ configParser = Config
     <> showDefault
     <> help "Filename of input DIMACS CNF file." )
   <*> strOption
-  ( short 'R'
-    <> long "order"
+  ( short 'r' <> short 'R'
+    <> long "order" <> long "ORDER"
     <> value "numeric"
     <> showDefault
     <> help "Variable ordering strategy." )
   <*> switch
-  ( short 'p'
-    <> long "ple"
+  ( short 'p' <> short 'P'
+    <> long "ple" <> long "PLE"
     -- <> value False
     <> showDefault
     <> help "Perform pure literal elimination ." )
   <*> switch
-  ( short 'u'
-    <> long "ucp"
+  ( short 'u' <> short 'U'
+    <> long "ucp" <> long "UCP"
     -- <> value False
     <> showDefault
     <> help "Perform unit clause propagation at each node of DPLL search tree." )

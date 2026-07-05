@@ -1,0 +1,7 @@
+c Demonstration of unit clause propagation on an unsatisfiable formula.
+
+p cnf 2 3
+
+1 0
+-1 2 0
+-1 -2 0
