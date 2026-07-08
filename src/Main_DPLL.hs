@@ -8,7 +8,7 @@ module Main where
 import Control.Monad (when)
 import Data.Char (toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
-import Data.List ((\\))
+import Data.List ((\\), partition)
 import Data.Maybe (mapMaybe)
 import Debug.Trace (trace)
 import Options.Applicative
@@ -103,8 +103,8 @@ firstUnitLit (c:cs) = case clauseUnitLit c of
 
 -- Search for unit literals (single unassigned literal in a clause), and
 -- condition formula over each literal.
-unitClauseProp :: String -> [Clause] -> IO ([Literal], [Clause])
-unitClauseProp prefix clauses = do
+unitClausePropM :: String -> [Clause] -> IO ([Literal], [Clause])
+unitClausePropM prefix clauses = do
   case firstUnitLit clauses of
     Nothing       -> pure ([], clauses)
     Just unit_lit -> do
@@ -112,7 +112,7 @@ unitClauseProp prefix clauses = do
       let cond_clauses = mapMaybe (conditionClause unit_lit) clauses
       putStr $ concat
         [prefix, "Unit Lit: ", show unit_lit, " -> CNF: ", show cond_clauses]
-      (next_lits, next_clauses) <- unitClauseProp prefix cond_clauses
+      (next_lits, next_clauses) <- unitClausePropM prefix cond_clauses
       pure (unit_lit : next_lits, next_clauses)
 
 -- DPLL ------------------------------------------------------------------------
@@ -148,7 +148,7 @@ dpll _ [] clauses _
 dpll conf (var:vars) clauses depth
   | elem [] clauses = dpllBacktrack
   | (conf_UCP conf) = do
-      (unit_lits, cs) <- unitClauseProp print_prefix clauses
+      (unit_lits, cs) <- unitClausePropM print_prefix clauses
       if null unit_lits
       then splitOnVar var vars clauses
       else do let next_vars = (var:vars) \\ (map abs unit_lits)
@@ -184,31 +184,33 @@ solve_dpll conf (CNF n_vars _ clauses) var_order = do
   putStrLn $ "Variable Order: " ++ show var_order
   newline
 
-  (assigned_lits, remaining_vars, current_clauses) <- do
+  let (tauts, clauses') = partition clauseIsTautology clauses
+  putStrLn $ "Removing tautologies: " ++ show tauts
+          ++ " -> CNF: " ++ show clauses'
+  newline
+
+  (assigned_lits, remaining_vars, clauses'') <- do
     if (conf_PLE conf)
     then do
       putStrLn "Performing pure literal elimination..."
-      (pure_lits, impure_clauses) <- pureLitElimRecM n_vars clauses
+      (pure_lits, impure_clauses) <- pureLitElimRecM n_vars clauses'
       putStrLn $ "Pure Literals Found: " ++ (show $ length pure_lits)
       newline
       pure ( pure_lits
            , filter (\v -> not $ elem v $ map abs pure_lits) var_order
            , impure_clauses )
-    else pure ([], var_order, clauses)
+    else pure ([], var_order, clauses')
 
   putStrLn $ "Assigned Literals:   " ++ show assigned_lits
   putStrLn $ "Remaining Variables: " ++ show remaining_vars
-  putStrLn $ "Current CNF:         " ++ show current_clauses
+  putStrLn $ "Current CNF:         " ++ show clauses''
   newline
 
-  result <-
-    if current_clauses == []
-    then do pure $ Just []
-    else do
-      putStr $ "Searching for satisfying assignment..."
-      result <- dpll conf remaining_vars current_clauses 0
-      putStrLn $ "\nSearch complete!\n"
-      pure result
+  putStr $ "Searching for satisfying assignment..."
+  when ((null clauses'') && (null remaining_vars)) $
+    putStr "\n[Depth 0] CNF: []"
+  result <- dpll conf remaining_vars clauses'' 0
+  putStrLn $ "\nSearch complete!\n"
 
   dpll_count' <- readIORef dpll_count
   ple_count' <- readIORef ple_count
