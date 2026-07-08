@@ -72,12 +72,12 @@ fillBuckets (v:vars) clauses =
 -- empty clause into "0" bucket.
 -- NOTE: Uses Resolvent instead of Clause only for log messages.
 bucketsInsertResolvent :: Resolvent -> [Bucket] -> IO [Bucket]
-bucketsInsertResolvent res [] = do  -- TODO: What if res taut.? Still prints...
+bucketsInsertResolvent res [] = do  -- TODO: What if res trivial? Still prints...
   putStrLn $ show res ++ " (failed to find bucket)"
   pure []
 bucketsInsertResolvent (Resolvent p1 p2 res) ((Bucket var cs):bs) = do
-  if clauseIsTautology res
-  then do putStrLn $ show orig_res ++ " (tautology)"
+  if clauseIsTrivial res
+  then do putStrLn $ show orig_res ++ " (trivial clause)"
           pure orig_buks
   else if clauseHasVar var res
        then if elem res cs
@@ -95,7 +95,7 @@ bucketsInsertResolvents (r:rs) bs = do
   new_bs <- (bucketsInsertResolvent r bs)
   bucketsInsertResolvents rs new_bs
 
--- Skips tautological resolvent clauses.
+-- Skips trivial resolvent clauses.
 resolveBuckets :: [Bucket] -> IO [Bucket]
 resolveBuckets [] = pure []
 resolveBuckets (b:bs) = do
@@ -178,8 +178,8 @@ solve_dp cnf var_order = do
 -- Main ------------------------------------------------------------------------
 
 data Config = Config
-  { conf_var_order :: String
-  , conf_cnf_file :: String
+  { conf_cnf_file :: String
+  , conf_var_order :: String
   } deriving (Show)
 
 configParser :: Parser Config

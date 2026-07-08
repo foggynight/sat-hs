@@ -184,8 +184,8 @@ solve_dpll conf (CNF n_vars _ clauses) var_order = do
   putStrLn $ "Variable Order: " ++ show var_order
   newline
 
-  let (tauts, clauses') = partition clauseIsTautology clauses
-  putStrLn $ "Removing tautologies: " ++ show tauts
+  let (trivial, clauses') = partition clauseIsTrivial clauses
+  putStrLn $ "Removing trivial clauses: " ++ show trivial
           ++ " -> CNF: " ++ show clauses'
   newline
 

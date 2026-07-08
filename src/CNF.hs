@@ -28,9 +28,9 @@ clauseHasVar 0 clause = (clause == [])
 clauseHasVar _ [] = False
 clauseHasVar var (lit:lits) = (abs lit == var) || clauseHasVar var lits
 
-clauseIsTautology :: Clause -> Bool
-clauseIsTautology [] = False
-clauseIsTautology (l:lits) = elem (-l) lits || clauseIsTautology lits
+clauseIsTrivial :: Clause -> Bool
+clauseIsTrivial [] = False
+clauseIsTrivial (l:lits) = elem (-l) lits || clauseIsTrivial lits
 
 conditionClause :: Literal -> Clause -> Maybe Clause
 conditionClause lit clause
